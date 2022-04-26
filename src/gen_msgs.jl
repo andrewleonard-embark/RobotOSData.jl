@@ -140,7 +140,7 @@ function gen_package(package::Symbol, msg_dir::String, deps)
         # end
     end
 
-    imports = [:(using $m) for m in deps]
+    imports = [Expr(:using, m) for m in deps]
     definitions = [expr for (_, expr) in decls]
     code = Expr(:block,
         :(using RobotOSData.Messages),
@@ -173,6 +173,22 @@ end
 function gen_module(mod_name::Symbol, ros_pkg_roots::Vector{String}, dst_dir::String, deps...)
     statements = Expr[]
     for src_dir in ros_pkg_roots
+        filename, pkg_name = gen_package_file(src_dir, dst_dir, deps...)
+        push!(statements, :(include($filename)))
+        push!(statements, :(export $pkg_name))        
+    end
+
+    mod_code = Expr(:module, true, mod_name, Expr(:block, statements...))
+
+    mod_path = joinpath(dst_dir, "$mod_name.jl")    
+    open(mod_path, "w") do io
+        print(io, mod_code)
+    end
+end
+
+function gen_module_deps(mod_name::Symbol, root_deps_pairs::Vector, dst_dir::String)
+    statements = Expr[]
+    for (src_dir, deps) in root_deps_pairs
         filename, pkg_name = gen_package_file(src_dir, dst_dir, deps...)
         push!(statements, :(include($filename)))
         push!(statements, :(export $pkg_name))        
